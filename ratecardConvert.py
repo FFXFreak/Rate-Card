@@ -20,6 +20,7 @@ def main():
     except:
         sys.exit("Static.csv not in expected location")
 
+    print("this will now extract from branch")
     #rename and drop apropriate columns
     df = df.rename(columns={'SOC Code': 'SKU', 'Description': 'DESCRIPTION'})
     df['SKU'] = df.apply(lambda x: x['SKU']+"N" if x['Acq_Ret'] ==
