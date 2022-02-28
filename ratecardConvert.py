@@ -7,6 +7,7 @@ input_folder = "\\Rate_Cards\\"
 output_folder = "Output_Rate_Cards\\"
 static_folder = "\\Static\\"
 
+# TO DO: include a comparison tool
 
 def main():
     files = []
@@ -66,19 +67,19 @@ def process_rate_card(filenumber, files):
     # skips any files that don't fit a format
     if "TYPE" in df and "SOC Code" in df and "Description" in df and "Acq_Ret" in df and "MAF (Inc VAT)" in df:
         if "Webchat" in df:
-            print(files[filenumber - 1] + " File Present")
+            print(files[filenumber - 1] + " file present")
         elif "Leeds White Rose" in df and "Leeds 8-9 Commercial Street" in df and "Castleford" in df:
-            print(files[filenumber - 1] + " File Present")
+            print(files[filenumber - 1] + " file present")
         else:
-            print(files[filenumber - 1] + " Incorrect format")
+            print(files[filenumber - 1] + " incorrect format")
             return
     else:
-        print(files[filenumber - 1] + " Incorrect format")
+        print(files[filenumber - 1] + " incorrect format")
         return
 
     # rename and drop apropriate columns
     df = df.rename(columns={'SOC Code': 'SKU', 'Description': 'DESCRIPTION'})
-    df['SKU'] = df.apply(lambda x: x['SKU']+"N" if x['Acq_Ret'] ==
+    df['SKU'] = df.apply(lambda x: str(x['SKU'])+"N" if x['Acq_Ret'] ==
                         'Acquisition' and x['TYPE'] != 'TALK MOBILE' else x['SKU'], axis=1)
     df.dropna(subset=['TYPE'], inplace=True)
 
@@ -97,6 +98,7 @@ def process_rate_card(filenumber, files):
             df.loc[index, "SKU"] = "TM" + str(row['Contract Length (Months)']) + str(row['MAF (Inc VAT)'])
     # removes columns we no longer need
     df.drop(['MAF (Inc VAT)','Contract Length (Months)'], axis=1, inplace=True)
+    df = df.drop_duplicates(subset=['SKU'], keep=False)
     try:
         df.drop(['Legacy Code - EBU', 'Band'], axis=1, inplace=True)
     except:
