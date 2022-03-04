@@ -98,7 +98,7 @@ def process_rate_card(filenumber, files):
             df.loc[index, "SKU"] = "TM" + str(row['Contract Length (Months)']) + str(row['MAF (Inc VAT)'])
     # removes columns we no longer need
     df.drop(['MAF (Inc VAT)','Contract Length (Months)'], axis=1, inplace=True)
-    df = df.drop_duplicates(subset=['SKU'], keep=False)
+    # df = df.drop_duplicates(subset=['SKU'], keep=False)
     try:
         df.drop(['Legacy Code - EBU', 'Band'], axis=1, inplace=True)
     except:
