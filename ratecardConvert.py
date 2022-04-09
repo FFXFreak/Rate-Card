@@ -40,6 +40,7 @@ def main():
 
     # we now are going to run this script until all files have been processed
     runtime = len(files)
+    print(files)
     while runtime != 0:
         process_rate_card(runtime, files)
         runtime -= 1
@@ -52,8 +53,9 @@ def process_rate_card(filenumber, files):
 
     # adds excel file and static files to dataframe and ensures file is readable.
     try:
-        df = pd.read_excel(os.getcwd() + input_folder + files[filenumber - 1])
+        df = pd.read_excel(os.getcwd() + input_folder + files[filenumber - 1], engine='openpyxl')
     except:
+        print(os.getcwd() + input_folder)
         print("There was an error opening the file " + files[filenumber - 1] + ". Please ensure you have closed the file so it can be read.")
         retry = input("Press any key to exit: ")
         sys.exit("Read File Error.")
@@ -137,9 +139,9 @@ def process_rate_card(filenumber, files):
                 df.loc[index, "COMMISSION_WR"] = row['Leeds White Rose'] * .1
                 df.loc[index, "COMMISSION_CAS"] = row['Castleford'] * .1
                 if row["Acq_Ret"] == 'Acquisition':
-                    df.loc[index, "COMMISSION_GIG"] = 50
+                    df.loc[index, "COMMISSION_GIG"] = row['Leeds White Rose'] * .3
                 else:
-                    df.loc[index, "COMMISSION_GIG"] = 20
+                    df.loc[index, "COMMISSION_GIG"] = row['Leeds White Rose'] * .3
             else:
                 df.loc[index, "COMMISSION_WR"] = row['Leeds White Rose'] * .05
                 df.loc[index, "COMMISSION_CAS"] = row['Castleford'] * .05
