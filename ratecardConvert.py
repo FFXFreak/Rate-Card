@@ -1,7 +1,20 @@
+from asyncio.windows_events import NULL
+from pickle import NONE
 import sys
 import glob, os
+import re
 
 import pandas as pd
+from sqlalchemy import null
+
+"""
+TODO: 
+1. Once sure of business process, remove creation of new csv and instead merge to WR and CAS CSV.
+2. Create a comparison tool
+"""
+
+# amount of discounts we need to run through for business
+discounts = 8
 
 input_folder = "\\Rate_Cards\\"
 output_folder = "Output_Rate_Cards\\"
@@ -51,6 +64,42 @@ def process_rate_card(filenumber, files):
     """This part of the program deals with the converting and 
         cleaning the data to make it usable and then exports as
         new .CSV file"""
+
+    # if business rate card
+    if "BIR" in files[filenumber - 1]:
+        disc_tot = NONE
+        # sets up pattern to check for franchise in sheet
+        pattern = r'(?i)(.*Franchise.*)'
+        sheets = pd.ExcelFile(os.getcwd() + input_folder + files[filenumber - 1], engine='openpyxl')
+        for sheet in sheets.sheet_names:
+            if re.search(pattern, sheet):
+                df = sheets.parse(sheet, parse_dates=True, skiprows=1)
+            else:
+                #if sheet doesn't have the word 'report' move on, nothing to see here
+                continue
+
+        df = df.rename(columns={'Legacy Code': 'SKU', 'Price Plan': 'DESCRIPTION', 'Product Type': 'TYPE'})
+        
+        disc = df.copy()
+        disc = disc.rename(columns={'No Discount' : 'REVENUE'})
+        disc = pd.DataFrame(disc,columns=['TYPE', 'SKU', 'DESCRIPTION', 'REVENUE'])
+        disc['SKU'] = disc['SKU'].apply(lambda x: str(x) +"ND")
+        disc_tot = disc.copy()
+
+        for discount in range(discounts):
+            name = f"Discount Level {discount + 1}"
+            sku_type = f"L{discount + 1}"
+            disc = df.copy()
+            disc = disc.rename(columns={name : 'REVENUE'})
+            disc = pd.DataFrame(disc,columns=['TYPE', 'SKU', 'DESCRIPTION', 'REVENUE'])
+            disc['SKU'] = disc['SKU'].apply(lambda x: str(x) + sku_type)
+            disc_tot = pd.concat([disc_tot, disc], ignore_index=True)
+
+        # creates a commission column for business tariffs and sets commission at 5%
+        for row in disc_tot.iterrows():
+            disc_tot['COMMISSION'] = disc_tot['REVENUE'].apply(lambda x: x *.05)
+        disc_tot.to_csv(output_folder + "Business.csv", index = None,  header=True)
+        return
 
     # adds excel file and static files to dataframe and ensures file is readable.
     try:
@@ -167,7 +216,7 @@ def process_rate_card(filenumber, files):
 
         # brings the 2 dataframes together
         wr_df = pd.concat([static_df, wr_df], ignore_index=True)
-        cas_df = pd.concat([static_df, cas_df], ignore_index=True)\
+        cas_df = pd.concat([static_df, cas_df], ignore_index=True)
 
         # exports all dataframes to .csv files
         wr_df.to_csv(output_folder + "Whiterose-L8.csv", index = None,  header=True)
