@@ -12,6 +12,7 @@ static_folder = "\\Static\\"
 def main():
     files = []
 
+
     # ensures the correct directories exist
     os.makedirs(os.getcwd() + input_folder, exist_ok=True)
     os.makedirs(os.getcwd() + output_folder, exist_ok=True)
@@ -166,8 +167,7 @@ def process_rate_card(filenumber, files):
 
         # brings the 2 dataframes together
         wr_df = pd.concat([static_df, wr_df], ignore_index=True)
-        cas_df = pd.concat([static_df, cas_df], ignore_index=True)
-        gig_df = pd.concat([static_df, gig_df], ignore_index=True)
+        cas_df = pd.concat([static_df, cas_df], ignore_index=True)\
 
         # exports all dataframes to .csv files
         wr_df.to_csv(output_folder + "Whiterose-L8.csv", index = None,  header=True)
