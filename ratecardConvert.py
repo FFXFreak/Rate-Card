@@ -14,7 +14,7 @@ TODO:
 """
 
 # amount of discounts we need to run through for business
-discounts = 8
+DISCOUNTS = 8
 
 input_folder = "\\Rate_Cards\\"
 output_folder = "Output_Rate_Cards\\"
@@ -52,54 +52,74 @@ def main():
     if not files and len(files) < 3:
         sys.exit("There are currently " + str(len(files)) + " files in the folder. Expecting Minimum of 1 and Maximum of 2")
 
+    # prepares any business rate cards
+    business_rates = prepare_business(files)
+
     # we now are going to run this script until all files have been processed
     runtime = len(files)
     print(files)
     while runtime != 0:
-        process_rate_card(runtime, files)
+        process_rate_card(runtime, files, business_rates)
         runtime -= 1
-    
+    return
 
-def process_rate_card(filenumber, files):
-    """This part of the program deals with the converting and 
-        cleaning the data to make it usable and then exports as
-        new .CSV file"""
 
-    # if business rate card
-    if "BIR" in files[filenumber - 1]:
-        disc_tot = NONE
-        # sets up pattern to check for franchise in sheet
-        pattern = r'(?i)(.*Franchise.*)'
-        sheets = pd.ExcelFile(os.getcwd() + input_folder + files[filenumber - 1], engine='openpyxl')
-        for sheet in sheets.sheet_names:
-            if re.search(pattern, sheet):
-                df = sheets.parse(sheet, parse_dates=True, skiprows=1)
-            else:
-                #if sheet doesn't have the word 'report' move on, nothing to see here
-                continue
+def prepare_business(files):
+    """
+    This function checks whether there is a business rate card to add. 
+    It will process it ready to be concatenated later in the program. 
+    """
+    # checks files for business rate card
+    pattern = r'(?i)(.*BIR.*)'
+    for file in files:
+        if re.search(pattern, file):
+            disc_tot = NONE
+            # sets up pattern to check for franchise in sheet
+            pattern = r'(?i)(.*Franchise.*)'
+            sheets = pd.ExcelFile(os.getcwd() + input_folder + file, engine='openpyxl')
+            for sheet in sheets.sheet_names:
+                if re.search(pattern, sheet):
+                    df = sheets.parse(sheet, parse_dates=True, skiprows=1)
+                    break
+                else:
+                    #if sheet doesn't have the word 'Franchise' we move to the next one.
+                    continue
+        else:
+            #if File doesn't have the word 'BIR' we move to the next one.
+            continue
 
-        df = df.rename(columns={'Legacy Code': 'SKU', 'Price Plan': 'DESCRIPTION', 'Product Type': 'TYPE'})
-        
-        disc = df.copy()
-        disc = disc.rename(columns={'No Discount' : 'REVENUE'})
-        disc = pd.DataFrame(disc,columns=['TYPE', 'SKU', 'DESCRIPTION', 'REVENUE'])
-        disc['SKU'] = disc['SKU'].apply(lambda x: str(x) +"ND")
-        disc_tot = disc.copy()
-
-        for discount in range(discounts):
-            name = f"Discount Level {discount + 1}"
-            sku_type = f"L{discount + 1}"
+        try:        
+            # deals with the first non discounted sku's
+            df = df.rename(columns={'Legacy Code': 'SKU', 'Price Plan': 'DESCRIPTION', 'Product Type': 'TYPE'})
             disc = df.copy()
-            disc = disc.rename(columns={name : 'REVENUE'})
+            disc = disc.rename(columns={'No Discount' : 'REVENUE'})
             disc = pd.DataFrame(disc,columns=['TYPE', 'SKU', 'DESCRIPTION', 'REVENUE'])
-            disc['SKU'] = disc['SKU'].apply(lambda x: str(x) + sku_type)
-            disc_tot = pd.concat([disc_tot, disc], ignore_index=True)
+            disc['SKU'] = disc['SKU'].apply(lambda x: str(x) +"ND")
+            disc_tot = disc.copy()
 
-        # creates a commission column for business tariffs and sets commission at 5%
-        for row in disc_tot.iterrows():
+            # deals with all other discount SKU's (set at the beginning of the program)
+            for discount in range(DISCOUNTS):
+                name = f"Discount Level {discount + 1}"
+                sku_type = f"L{discount + 1}"
+                disc = df.copy()
+                disc = disc.rename(columns={name : 'REVENUE'})
+                disc = pd.DataFrame(disc,columns=['TYPE', 'SKU', 'DESCRIPTION', 'REVENUE'])
+                disc['SKU'] = disc['SKU'].apply(lambda x: str(x) + sku_type)
+                disc_tot = pd.concat([disc_tot, disc], ignore_index=True)
+
+            # creates a commission column for business tariffs and sets commission at 5%
             disc_tot['COMMISSION'] = disc_tot['REVENUE'].apply(lambda x: x *.05)
-        disc_tot.to_csv(output_folder + "Business.csv", index = None,  header=True)
-        return
+            return disc_tot
+        except:
+            print("No Business Rate Card Present")
+            return
+
+def process_rate_card(filenumber, files, business_rates):
+    """
+    This part of the program deals with the converting and 
+    cleaning the data to make it usable and then exports as
+    new .CSV file
+    """
 
     # adds excel file and static files to dataframe and ensures file is readable.
     try:
@@ -172,6 +192,7 @@ def process_rate_card(filenumber, files):
         df['COMMISSION'] = df['REVENUE'].apply(lambda x: x *.1)
         # merges the 2 dataframes
         df = pd.concat([static_df, df], ignore_index=True)
+        df = pd.concat([df, business_rates], ignore_index=True)
 
         # creates a .CSV for webchat
         df.to_csv(output_folder + "Webchat.csv", index = None,  header=True)
@@ -217,7 +238,11 @@ def process_rate_card(filenumber, files):
         # brings the 2 dataframes together
         wr_df = pd.concat([static_df, wr_df], ignore_index=True)
         cas_df = pd.concat([static_df, cas_df], ignore_index=True)
-
+        try:
+            wr_df = pd.concat([wr_df, business_rates], ignore_index=True)
+            cas_df = pd.concat([cas_df, business_rates], ignore_index=True)
+        except:
+            pass
         # exports all dataframes to .csv files
         wr_df.to_csv(output_folder + "Whiterose-L8.csv", index = None,  header=True)
         cas_df.to_csv(output_folder + "Castleford.csv", index = None,  header=True)
