@@ -5,15 +5,14 @@ import glob, os
 import re
 
 import pandas as pd
-from sqlalchemy import null
 
 """
 TODO: 
-1. Once sure of business process, remove creation of new csv and instead merge to WR and CAS CSV.
-2. Create a comparison tool
+1. Create a comparison tool
 """
 
-# amount of discounts we need to run through for business
+# amount of discounts we need to run through for business - Change this if there are ever more or less discounts available
+# This deals with 9 total tariffs (no discount and amount of discounts stated below)
 DISCOUNTS = 8
 
 input_folder = "\\Rate_Cards\\"
@@ -70,7 +69,7 @@ def prepare_business(files):
     It will process it ready to be concatenated later in the program. 
     """
     # checks files for business rate card
-    pattern = r'(?i)(.*BIR.*)'
+    pattern = r'(?i)(.*Business.*)'
     for file in files:
         if re.search(pattern, file):
             disc_tot = NONE
@@ -99,7 +98,7 @@ def prepare_business(files):
 
             # deals with all other discount SKU's (set at the beginning of the program)
             for discount in range(DISCOUNTS):
-                name = f"Discount Level {discount + 1}"
+                name = f"Discount {discount + 1}"
                 sku_type = f"L{discount + 1}"
                 disc = df.copy()
                 disc = disc.rename(columns={name : 'REVENUE'})
@@ -200,21 +199,24 @@ def process_rate_card(filenumber, files, business_rates):
     else:
         # creates the commission columns for all stores
         df['COMMISSION_WR'] = df['Leeds White Rose']
+        df['COMMISSION_L8'] = df['Leeds 8-9 Commercial Street']
         df['COMMISSION_CAS'] = df['Castleford']
-        df['Gigafast'] = df['Leeds White Rose']
+        df['Gigafast'] = df['Leeds 8-9 Commercial Street']
         df['COMMISSION_GIG'] = df['Gigafast']
 
         # we run through the rows and set the correct commission for each store
         for index, row in df.iterrows():
             if 'HBB' in row['TYPE']:
                 df.loc[index, "COMMISSION_WR"] = row['Leeds White Rose'] * .1
+                df.loc[index,'COMMISSION_L8'] = row['Leeds 8-9 Commercial Street'] * .1
                 df.loc[index, "COMMISSION_CAS"] = row['Castleford'] * .1
                 if row["Acq_Ret"] == 'Acquisition':
-                    df.loc[index, "COMMISSION_GIG"] = row['Leeds White Rose'] * .3
+                    df.loc[index, "COMMISSION_GIG"] = row['Leeds 8-9 Commercial Street'] * .3
                 else:
-                    df.loc[index, "COMMISSION_GIG"] = row['Leeds White Rose'] * .3
+                    df.loc[index, "COMMISSION_GIG"] = row['Leeds 8-9 Commercial Street'] * .3
             else:
                 df.loc[index, "COMMISSION_WR"] = row['Leeds White Rose'] * .05
+                df.loc[index,'COMMISSION_L8'] = row['Leeds 8-9 Commercial Street'] * .05
                 df.loc[index, "COMMISSION_CAS"] = row['Castleford'] * .05
                 df.loc[index, "COMMISSION_GIG"] = 0
                 df.loc[index, "Gigafast"] = 0
@@ -224,27 +226,33 @@ def process_rate_card(filenumber, files, business_rates):
 
         # there are 3 versions of the dataframe we need so this creates them
         wr_df = df.copy()
+        l8_df = df.copy()
         cas_df = df.copy()
         gig_df = df.copy()
 
         # cleaning up all the data so that the My Ratecard database can read it
+        l8_df = df.rename(columns={'Leeds 8-9 Commercial Street': 'REVENUE', 'COMMISSION_L8': 'COMMISSION'})
+        l8_df.drop(['Gigafast','Leeds White Rose','Castleford', 'COMMISSION_WR', 'COMMISSION_CAS', 'COMMISSION_GIG'], axis=1, inplace=True)
         wr_df = df.rename(columns={'Leeds White Rose': 'REVENUE', 'COMMISSION_WR': 'COMMISSION'})
-        wr_df.drop(['Gigafast','Leeds 8-9 Commercial Street','Castleford', 'COMMISSION_CAS', 'COMMISSION_GIG'], axis=1, inplace=True)
+        wr_df.drop(['Gigafast','Leeds 8-9 Commercial Street','Castleford', 'COMMISSION_CAS', 'COMMISSION_GIG', 'COMMISSION_L8'], axis=1, inplace=True)
         cas_df = df.rename(columns={'Castleford': 'REVENUE', 'COMMISSION_CAS': 'COMMISSION'})
-        cas_df.drop(['Gigafast','Leeds White Rose','Leeds 8-9 Commercial Street', 'COMMISSION_WR', 'COMMISSION_GIG'], axis=1, inplace=True)
+        cas_df.drop(['Gigafast','Leeds White Rose','Leeds 8-9 Commercial Street', 'COMMISSION_WR', 'COMMISSION_GIG', 'COMMISSION_L8'], axis=1, inplace=True)
         gig_df = df.rename(columns={'Gigafast': 'REVENUE', 'COMMISSION_GIG': 'COMMISSION'})
-        gig_df.drop(['Castleford','Leeds White Rose','Leeds 8-9 Commercial Street', 'COMMISSION_WR', 'COMMISSION_CAS'], axis=1, inplace=True)
+        gig_df.drop(['Castleford','Leeds White Rose','Leeds 8-9 Commercial Street', 'COMMISSION_WR', 'COMMISSION_CAS', 'COMMISSION_L8'], axis=1, inplace=True)
 
         # brings the 2 dataframes together
         wr_df = pd.concat([static_df, wr_df], ignore_index=True)
         cas_df = pd.concat([static_df, cas_df], ignore_index=True)
+        l8_df = pd.concat([static_df, l8_df], ignore_index=True)
         try:
             wr_df = pd.concat([wr_df, business_rates], ignore_index=True)
             cas_df = pd.concat([cas_df, business_rates], ignore_index=True)
+            l8_df = pd.concat([l8_df, business_rates], ignore_index=True)
         except:
             pass
         # exports all dataframes to .csv files
-        wr_df.to_csv(output_folder + "Whiterose-L8.csv", index = None,  header=True)
+        wr_df.to_csv(output_folder + "Whiterose.csv", index = None,  header=True)
+        l8_df.to_csv(output_folder + "Leeds-8.csv", index = None,  header=True)
         cas_df.to_csv(output_folder + "Castleford.csv", index = None,  header=True)
         gig_df.to_csv(output_folder + "Gigafast.csv", index = None,  header=True)
         return
